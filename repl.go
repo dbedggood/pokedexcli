@@ -85,6 +85,18 @@ func commandHelp(commands map[string]cliCommand) error {
 	return nil
 }
 
+type LocationArea struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type LocationAreaResponse struct {
+	Count    int            `json:"count"`
+	Next     string         `json:"next"`
+	Previous string         `json:"previous"`
+	Results  []LocationArea `json:"results"`
+}
+
 var nextUrl string
 var prevUrl string
 
@@ -123,24 +135,17 @@ func fetchAndDisplayAreas(url string) error {
 		return fmt.Errorf("error fetching data: %s", res.Status)
 	}
 
-	decodedStruct := struct {
-		Next     string `json:"next"`
-		Previous string `json:"previous"`
-		Results  []struct {
-			Name string `json:"name"`
-		} `json:"results"`
-	}{}
-
+	locationAreaResponse := LocationAreaResponse{}
 	decoder := json.NewDecoder(res.Body)
-	if err := decoder.Decode(&decodedStruct); err != nil {
+	if err := decoder.Decode(&locationAreaResponse); err != nil {
 		return fmt.Errorf("error decoding response: %v", err)
 	}
 
-	for _, area := range decodedStruct.Results {
+	for _, area := range locationAreaResponse.Results {
 		fmt.Println(area.Name)
 	}
 
-	nextUrl = decodedStruct.Next
-	prevUrl = decodedStruct.Previous
+	nextUrl = locationAreaResponse.Next
+	prevUrl = locationAreaResponse.Previous
 	return nil
 }
