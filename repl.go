@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -27,6 +29,16 @@ func startRepl() {
 		name:        "exit",
 		description: "Exit the Pokedex",
 		callback:    commandExit,
+	}
+	commands["map"] = cliCommand{
+		name:        "map",
+		description: "Display names of next 20 areas",
+		callback:    commandMap,
+	}
+	commands["mapb"] = cliCommand{
+		name:        "map",
+		description: "Display names of previous 20 areas",
+		callback:    commandMapBack,
 	}
 
 	for {
@@ -70,5 +82,65 @@ func commandHelp(commands map[string]cliCommand) error {
 	for _, command := range commands {
 		fmt.Println(command.name + ": " + command.description)
 	}
+	return nil
+}
+
+var nextUrl string
+var prevUrl string
+
+func commandMap() error {
+	if err := fetchAndDisplayAreas(nextUrl); err != nil {
+		return err
+	}
+	return nil
+}
+
+func commandMapBack() error {
+	if err := fetchAndDisplayAreas(prevUrl); err != nil {
+		return err
+	}
+	return nil
+}
+
+func fetchAndDisplayAreas(url string) error {
+	if url == "" {
+		url = "https://pokeapi.co/api/v2/location-area"
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return fmt.Errorf("error fetching data: %s", res.Status)
+	}
+
+	decodedStruct := struct {
+		Next     string `json:"next"`
+		Previous string `json:"previous"`
+		Results  []struct {
+			Name string `json:"name"`
+		} `json:"results"`
+	}{}
+
+	decoder := json.NewDecoder(res.Body)
+	if err := decoder.Decode(&decodedStruct); err != nil {
+		return fmt.Errorf("error decoding response: %v", err)
+	}
+
+	for _, area := range decodedStruct.Results {
+		fmt.Println(area.Name)
+	}
+
+	nextUrl = decodedStruct.Next
+	prevUrl = decodedStruct.Previous
 	return nil
 }
