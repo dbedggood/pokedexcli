@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/dbedggood/pokedexcli/internal/pokecache"
 )
 
 type cliCommand struct {
@@ -16,6 +19,7 @@ type cliCommand struct {
 }
 
 func startRepl() {
+
 	scanner := bufio.NewScanner(os.Stdin)
 
 	commands := map[string]cliCommand{}
@@ -114,31 +118,53 @@ func commandMapBack() error {
 	return nil
 }
 
+var cache *internal.Cache
+
 func fetchAndDisplayAreas(url string) error {
+	// TODO: abstract fetching and caching logic out of this function
+
 	if url == "" {
-		url = "https://pokeapi.co/api/v2/location-area"
+		url = "https://pokeapi.co/api/v2/location-area?offset=0&limit=20"
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return err
-	}
-
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return fmt.Errorf("error fetching data: %s", res.Status)
+	if cache == nil {
+		cache = internal.NewCache(5 * time.Minute)
 	}
 
 	locationAreaResponse := LocationAreaResponse{}
-	decoder := json.NewDecoder(res.Body)
-	if err := decoder.Decode(&locationAreaResponse); err != nil {
-		return fmt.Errorf("error decoding response: %v", err)
+
+	if cachedData, exists := cache.Get(url); !exists {
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return err
+		}
+
+		client := &http.Client{}
+		res, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode < 200 || res.StatusCode >= 300 {
+			return fmt.Errorf("error fetching data: %s", res.Status)
+		}
+
+		decoder := json.NewDecoder(res.Body)
+		if err := decoder.Decode(&locationAreaResponse); err != nil {
+			return fmt.Errorf("error decoding response: %v", err)
+		}
+
+		data, err := json.Marshal(locationAreaResponse)
+		if err != nil {
+			return err
+		}
+
+		cache.Add(url, data)
+	} else {
+		if err := json.Unmarshal(cachedData, &locationAreaResponse); err != nil {
+			return err
+		}
 	}
 
 	for _, area := range locationAreaResponse.Results {
