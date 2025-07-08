@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/dbedggood/pokedexcli/internal/pokecache"
+	pokeapi "github.com/dbedggood/pokedexcli/internal/pokeapi"
+	pokecache "github.com/dbedggood/pokedexcli/internal/pokecache"
 )
 
 type cliCommand struct {
@@ -118,7 +118,7 @@ func commandMapBack() error {
 	return nil
 }
 
-var cache *internal.Cache
+var cache *pokecache.Cache
 
 func fetchAndDisplayAreas(url string) error {
 	// TODO: abstract fetching and caching logic out of this function
@@ -128,32 +128,13 @@ func fetchAndDisplayAreas(url string) error {
 	}
 
 	if cache == nil {
-		cache = internal.NewCache(5 * time.Minute)
+		cache = pokecache.NewCache(5 * time.Minute)
 	}
 
 	locationAreaResponse := LocationAreaResponse{}
 
 	if cachedData, exists := cache.Get(url); !exists {
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return err
-		}
-
-		client := &http.Client{}
-		res, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer res.Body.Close()
-
-		if res.StatusCode < 200 || res.StatusCode >= 300 {
-			return fmt.Errorf("error fetching data: %s", res.Status)
-		}
-
-		decoder := json.NewDecoder(res.Body)
-		if err := decoder.Decode(&locationAreaResponse); err != nil {
-			return fmt.Errorf("error decoding response: %v", err)
-		}
+		err := pokeapi.Fetch(url, &locationAreaResponse)
 
 		data, err := json.Marshal(locationAreaResponse)
 		if err != nil {
