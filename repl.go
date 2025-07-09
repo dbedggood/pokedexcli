@@ -37,7 +37,7 @@ func startRepl() {
 		callback:    commandMap,
 	}
 	commands["mapb"] = cliCommand{
-		name:        "map",
+		name:        "mapb",
 		description: "Display names of previous 20 areas",
 		callback:    commandMapBack,
 	}
@@ -116,7 +116,6 @@ func commandMapBack() error {
 }
 
 func fetchAndDisplayAreas(url string) error {
-
 	if url == "" {
 		url = "https://pokeapi.co/api/v2/location-area?offset=0&limit=20"
 	}
