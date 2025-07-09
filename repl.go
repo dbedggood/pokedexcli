@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,7 +13,7 @@ import (
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func([]string) error
 }
 
 func startRepl() {
@@ -24,7 +25,9 @@ func startRepl() {
 	commands["help"] = cliCommand{
 		name:        "help",
 		description: "Displays a help message",
-		callback:    func() error { return commandHelp(commands) },
+		callback: func(args []string) error {
+			return commandHelp(args, commands)
+		},
 	}
 	commands["exit"] = cliCommand{
 		name:        "exit",
@@ -40,6 +43,11 @@ func startRepl() {
 		name:        "mapb",
 		description: "Display names of previous 20 areas",
 		callback:    commandMapBack,
+	}
+	commands["explore"] = cliCommand{
+		name:        "explore",
+		description: "Explore a new area",
+		callback:    commandExplore,
 	}
 
 	for {
@@ -59,8 +67,13 @@ func startRepl() {
 			continue
 		}
 
-		if err := command.callback(); err != nil {
-			fmt.Printf("Error executing command\n")
+		args := []string{}
+		if len(words) > 1 {
+			args = words[1:]
+		}
+
+		if err := command.callback(args); err != nil {
+			fmt.Println("Error executing command:", err)
 			continue
 		}
 	}
@@ -72,13 +85,18 @@ func cleanInput(text string) []string {
 	return words
 }
 
-func commandExit() error {
+func commandExit(args []string) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp(commands map[string]cliCommand) error {
+func commandHelp(args []string, commands map[string]cliCommand) error {
+	if len(args) > 0 {
+		fmt.Println("Usage: help")
+		return nil
+	}
+
 	fmt.Print("Welcome to the Pokedex!\nUsage:\n\n")
 	for _, command := range commands {
 		fmt.Println(command.name + ": " + command.description)
@@ -86,29 +104,73 @@ func commandHelp(commands map[string]cliCommand) error {
 	return nil
 }
 
-type LocationArea struct {
+type result struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
 }
 
-type LocationAreaResponse struct {
-	Count    int            `json:"count"`
-	Next     string         `json:"next"`
-	Previous string         `json:"previous"`
-	Results  []LocationArea `json:"results"`
+type LocationAreas struct {
+	Count    int      `json:"count"`
+	Next     string   `json:"next"`
+	Previous string   `json:"previous"`
+	Results  []result `json:"results"`
 }
+
+type LocationAreaDetails struct {
+	EncounterMethodRates []struct {
+		EncounterMethod result `json:"encounter_method"`
+		VersionDetails  []struct {
+			Rate    int    `json:"rate"`
+			Version result `json:"version"`
+		} `json:"version_details"`
+	} `json:"encounter_method_rates"`
+	GameIndex int    `json:"game_index"`
+	ID        int    `json:"id"`
+	Location  result `json:"location"`
+	Name      string `json:"name"`
+	Names     []struct {
+		Language result `json:"language"`
+		Name     string `json:"name"`
+	} `json:"names"`
+	PokemonEncounters []struct {
+		Pokemon        result `json:"pokemon"`
+		VersionDetails []struct {
+			EncounterDetails []struct {
+				Chance          int    `json:"chance"`
+				ConditionValues []any  `json:"condition_values"`
+				MaxLevel        int    `json:"max_level"`
+				Method          result `json:"method"`
+				MinLevel        int    `json:"min_level"`
+			} `json:"encounter_details"`
+			MaxChance int    `json:"max_chance"`
+			Version   result `json:"version"`
+		} `json:"version_details"`
+	} `json:"pokemon_encounters"`
+}
+
+const LOCATION_AREA_BASE_URL = "https://pokeapi.co/api/v2/location-area/"
 
 var nextUrl string
 var prevUrl string
 
-func commandMap() error {
+func commandMap(args []string) error {
+	if len(args) > 0 {
+		fmt.Println("Usage: map")
+		return nil
+	}
+
 	if err := fetchAndDisplayAreas(nextUrl); err != nil {
 		return err
 	}
 	return nil
 }
 
-func commandMapBack() error {
+func commandMapBack(args []string) error {
+	if len(args) > 0 {
+		fmt.Println("Usage: mapb")
+		return nil
+	}
+
 	if err := fetchAndDisplayAreas(prevUrl); err != nil {
 		return err
 	}
@@ -117,19 +179,40 @@ func commandMapBack() error {
 
 func fetchAndDisplayAreas(url string) error {
 	if url == "" {
-		url = "https://pokeapi.co/api/v2/location-area?offset=0&limit=20"
+		url = LOCATION_AREA_BASE_URL + "?offset=0&limit=20"
 	}
 
-	locationAreaResponse := LocationAreaResponse{}
-	if err := pokeapi.Fetch(url, &locationAreaResponse); err != nil {
+	locationAreas := LocationAreas{}
+	if err := pokeapi.Fetch(url, &locationAreas); err != nil {
 		return err
 	}
 
-	for _, area := range locationAreaResponse.Results {
+	for _, area := range locationAreas.Results {
 		fmt.Println(area.Name)
 	}
 
-	nextUrl = locationAreaResponse.Next
-	prevUrl = locationAreaResponse.Previous
+	nextUrl = locationAreas.Next
+	prevUrl = locationAreas.Previous
+	return nil
+}
+
+func commandExplore(args []string) error {
+	if len(args) == 0 {
+		return errors.New("argument cannot be empty")
+	}
+	locationAreaName := args[0]
+
+	fmt.Println("Exploring pastoria-city-area...")
+
+	locationAreaDetails := LocationAreaDetails{}
+	if err := pokeapi.Fetch(LOCATION_AREA_BASE_URL+locationAreaName, &locationAreaDetails); err != nil {
+		return err
+	}
+
+	fmt.Println("Found Pokemon:")
+	for _, encounter := range locationAreaDetails.PokemonEncounters {
+		fmt.Println(" - ", encounter.Pokemon.Name)
+	}
+
 	return nil
 }
