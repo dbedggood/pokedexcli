@@ -158,7 +158,7 @@ func commandExplore(args []string) error {
 	}
 	locationAreaName := args[0]
 
-	fmt.Println("Exploring pastoria-city-area...")
+	fmt.Println("Exploring " + locationAreaName + "...")
 
 	locationAreaDetails := LocationAreaDetails{}
 	if err := pokeapi.Fetch(LOCATION_AREA_BASE_URL+locationAreaName, &locationAreaDetails); err != nil {
