@@ -3,16 +3,28 @@ package pokeapi
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"time"
+
+	"github.com/dbedggood/pokedexcli/internal/pokecache"
 )
 
+var cache *pokecache.Cache
+
 func Fetch[T any](url string, resPointer *T) error {
-	if resPointer == nil {
-		return errors.New("resPointer cannot be nil")
+	if url == "" || resPointer == nil {
+		return errors.New("args cannot be empty")
 	}
 
-	if url == "" {
-		return errors.New("url cannot be empty")
+	if cache == nil {
+		cache = pokecache.NewCache(time.Second * 5)
+	}
+	if cachedData, exists := cache.Get(url); exists {
+		if err := json.Unmarshal(cachedData, resPointer); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -21,19 +33,21 @@ func Fetch[T any](url string, resPointer *T) error {
 	}
 
 	client := &http.Client{}
-	resp, err := client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer res.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusOK {
 		return errors.New("unexpected status code")
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(resPointer); err != nil {
+	fetchedData, err := io.ReadAll(res.Body)
+	if err := json.Unmarshal(fetchedData, resPointer); err != nil {
 		return err
 	}
 
+	cache.Add(url, fetchedData)
 	return nil
 }

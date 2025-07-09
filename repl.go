@@ -2,14 +2,11 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	pokeapi "github.com/dbedggood/pokedexcli/internal/pokeapi"
-	pokecache "github.com/dbedggood/pokedexcli/internal/pokecache"
 )
 
 type cliCommand struct {
@@ -118,34 +115,15 @@ func commandMapBack() error {
 	return nil
 }
 
-var cache *pokecache.Cache
-
 func fetchAndDisplayAreas(url string) error {
-	// TODO: abstract fetching and caching logic out of this function
 
 	if url == "" {
 		url = "https://pokeapi.co/api/v2/location-area?offset=0&limit=20"
 	}
 
-	if cache == nil {
-		cache = pokecache.NewCache(5 * time.Minute)
-	}
-
 	locationAreaResponse := LocationAreaResponse{}
-
-	if cachedData, exists := cache.Get(url); !exists {
-		err := pokeapi.Fetch(url, &locationAreaResponse)
-
-		data, err := json.Marshal(locationAreaResponse)
-		if err != nil {
-			return err
-		}
-
-		cache.Add(url, data)
-	} else {
-		if err := json.Unmarshal(cachedData, &locationAreaResponse); err != nil {
-			return err
-		}
+	if err := pokeapi.Fetch(url, &locationAreaResponse); err != nil {
+		return err
 	}
 
 	for _, area := range locationAreaResponse.Results {
