@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"strings"
+	"time"
 
 	pokeapi "github.com/dbedggood/pokedexcli/internal/pokeapi"
 )
@@ -48,6 +50,11 @@ func startRepl() {
 		name:        "explore",
 		description: "Explore a new area",
 		callback:    commandExplore,
+	}
+	commands["catch"] = cliCommand{
+		name:        "catch",
+		description: "Catch a Pokemon",
+		callback:    commandCatch,
 	}
 
 	for {
@@ -171,4 +178,42 @@ func commandExplore(args []string) error {
 	}
 
 	return nil
+}
+
+var pokedex []Pokemon
+
+func commandCatch(args []string) error {
+	if len(args) == 0 {
+		return errors.New("please provide a pokemon name")
+	}
+
+	pokemonName := args[0]
+	url := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon-species/%s", pokemonName)
+
+	pokemon := Pokemon{}
+	if err := pokeapi.Fetch(url, &pokemon); err != nil {
+		return err
+	}
+
+	fmt.Println("Throwing a Pokeball at " + pokemon.Name + "...")
+
+	time.Sleep(1 * time.Second)
+
+	if wasPokemonCaught(pokemon) {
+		fmt.Println(pokemon.Name + " was caught!")
+
+		if pokedex == nil {
+			pokedex = make([]Pokemon, 0)
+		}
+		pokedex = append(pokedex, pokemon)
+	} else {
+		fmt.Println(pokemon.Name + " escaped!")
+	}
+
+	return nil
+}
+
+func wasPokemonCaught(pokemon Pokemon) bool {
+	r := rand.Float64()
+	return r < float64(pokemon.CaptureRate)/255.0
 }
