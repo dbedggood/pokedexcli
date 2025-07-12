@@ -61,6 +61,11 @@ func startRepl() {
 		description: "Inspect a Pokemon",
 		callback:    commandInspect,
 	}
+	commands["pokedex"] = cliCommand{
+		name:        "pokedex",
+		description: "Display information about a Pokemon",
+		callback:    commandPokedex,
+	}
 
 	for {
 		fmt.Print("Pokedex > ")
@@ -250,6 +255,23 @@ func commandInspect(args []string) error {
 	fmt.Println("Types:")
 	for _, type_ := range pokemon.Types {
 		fmt.Printf(" - %s\n", type_.Type.Name)
+	}
+
+	return nil
+}
+
+func commandPokedex(args []string) error {
+	if len(args) > 0 {
+		return errors.New("don't give me an arg")
+	}
+
+	if len(pokedex) == 0 {
+		return errors.New("you haven't caught any pokemon yet")
+	}
+
+	fmt.Println("Your Pokedex:")
+	for name, _ := range pokedex {
+		fmt.Println(" - " + name)
 	}
 
 	return nil
