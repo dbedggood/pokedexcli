@@ -56,6 +56,11 @@ func startRepl() {
 		description: "Catch a Pokemon",
 		callback:    commandCatch,
 	}
+	commands["inspect"] = cliCommand{
+		name:        "inspect",
+		description: "Inspect a Pokemon",
+		callback:    commandInspect,
+	}
 
 	for {
 		fmt.Print("Pokedex > ")
@@ -180,7 +185,7 @@ func commandExplore(args []string) error {
 	return nil
 }
 
-var pokedex []Pokemon
+var pokedex map[string]Pokemon
 
 func commandCatch(args []string) error {
 	if len(args) == 0 {
@@ -188,10 +193,16 @@ func commandCatch(args []string) error {
 	}
 
 	pokemonName := args[0]
-	url := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon-species/%s", pokemonName)
 
+	pokemonSpeciesUrl := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon-species/%s", pokemonName)
+	pokemonSpecies := PokemonSpecies{}
+	if err := pokeapi.Fetch(pokemonSpeciesUrl, &pokemonSpecies); err != nil {
+		return err
+	}
+
+	pokemonUrl := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s", pokemonName)
 	pokemon := Pokemon{}
-	if err := pokeapi.Fetch(url, &pokemon); err != nil {
+	if err := pokeapi.Fetch(pokemonUrl, &pokemon); err != nil {
 		return err
 	}
 
@@ -199,13 +210,13 @@ func commandCatch(args []string) error {
 
 	time.Sleep(1 * time.Second)
 
-	if wasPokemonCaught(pokemon) {
+	if wasPokemonCaught(pokemonSpecies.CaptureRate) {
 		fmt.Println(pokemon.Name + " was caught!")
 
 		if pokedex == nil {
-			pokedex = make([]Pokemon, 0)
+			pokedex = map[string]Pokemon{}
 		}
-		pokedex = append(pokedex, pokemon)
+		pokedex[pokemon.Name] = pokemon
 	} else {
 		fmt.Println(pokemon.Name + " escaped!")
 	}
@@ -213,7 +224,33 @@ func commandCatch(args []string) error {
 	return nil
 }
 
-func wasPokemonCaught(pokemon Pokemon) bool {
+func wasPokemonCaught(captureRate int) bool {
 	r := rand.Float64()
-	return r < float64(pokemon.CaptureRate)/255.0
+	return r < float64(captureRate)/255.0
+}
+
+func commandInspect(args []string) error {
+	if len(args) == 0 {
+		return errors.New("please provide a pokemon name")
+	}
+
+	pokemonName := args[0]
+	pokemon, ok := pokedex[pokemonName]
+	if !ok {
+		return errors.New("pokemon not caught yet")
+	}
+
+	fmt.Println("Name:", pokemon.Name)
+	fmt.Println("Height:", pokemon.Height)
+	fmt.Println("Weight:", pokemon.Weight)
+	fmt.Println("Stats:")
+	for _, stat := range pokemon.Stats {
+		fmt.Printf(" - %s: %d\n", stat.Stat.Name, stat.BaseStat)
+	}
+	fmt.Println("Types:")
+	for _, type_ := range pokemon.Types {
+		fmt.Printf(" - %s\n", type_.Type.Name)
+	}
+
+	return nil
 }
