@@ -63,7 +63,7 @@ func startRepl() {
 	}
 	commands["pokedex"] = cliCommand{
 		name:        "pokedex",
-		description: "Display information about a Pokemon",
+		description: "List all the pokemon you have caught",
 		callback:    commandPokedex,
 	}
 
