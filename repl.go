@@ -121,8 +121,6 @@ func commandHelp(args []string, commands map[string]cliCommand) error {
 	return nil
 }
 
-const LOCATION_AREA_BASE_URL = "https://pokeapi.co/api/v2/location-area/"
-
 var nextUrl string
 var prevUrl string
 
@@ -199,13 +197,13 @@ func commandCatch(args []string) error {
 
 	pokemonName := args[0]
 
-	pokemonSpeciesUrl := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon-species/%s", pokemonName)
+	pokemonSpeciesUrl := POKEMON_SPECIES_BASE_URL + pokemonName
 	pokemonSpecies := PokemonSpecies{}
 	if err := pokeapi.Fetch(pokemonSpeciesUrl, &pokemonSpecies); err != nil {
 		return err
 	}
 
-	pokemonUrl := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s", pokemonName)
+	pokemonUrl := POKEMON_BASE_URL + pokemonName
 	pokemon := Pokemon{}
 	if err := pokeapi.Fetch(pokemonUrl, &pokemon); err != nil {
 		return err
